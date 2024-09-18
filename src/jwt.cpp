@@ -1,5 +1,10 @@
 #include <jwt-cpp/jwt.h>
+#include <delameta/error.h>
 
+using namespace Project;
+using delameta::Result;
+using etl::Ok;
+using etl::Err;
 using namespace std::literals;
 
 const auto EXPIRES_IN = 60min * 24;
@@ -21,17 +26,21 @@ auto jwt_create_token(const std::vector<std::pair<std::string, std::string>>& pa
 }
 
 [[export, throw]]
-auto jwt_decode_token(const std::string& token) -> std::string {
-    auto decoded = jwt::decode(token);
-    jwt::verify()
-        .allow_algorithm(ALGORITHM)
-        .with_issuer(ISSUER)
-        .verify(decoded);
+auto jwt_decode_token(const std::string& token) -> Result<std::string> {
+    try {
+        auto decoded = jwt::decode(token);
+        jwt::verify()
+            .allow_algorithm(ALGORITHM)
+            .with_issuer(ISSUER)
+            .verify(decoded);
 
-    auto exp_claim = decoded.get_expires_at();
-    if (exp_claim <= std::chrono::system_clock::now()) {
-        throw std::runtime_error("Token has expired");
+        auto exp_claim = decoded.get_expires_at();
+        if (exp_claim <= std::chrono::system_clock::now()) {
+            throw std::runtime_error("Token has expired");
+        }
+
+        return Ok(decoded.get_payload());
+    } catch (const std::exception& e) {
+        return Err(e.what());
     }
-
-    return decoded.get_payload();
 }

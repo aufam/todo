@@ -12,7 +12,7 @@ To build and run the TODO app, ensure that the following are installed on your s
 The TODO app includes several powerful features:
 * Dependency management using [`cpm-cmake`](https://github.com/cpm-cmake/CPM.cmake)
 * [`delameta`](https://github.com/aufam/delameta) framework:
-    * FastAPI-like decorator pattern using `delameta::http` for easy http route handling
+    * FastAPI-like decorator pattern using `delameta::http` for easy and readable http route handling
     * Lightweight JSON Serialization/Deserialization using `delameta::json`
     * Type safety for cleaner and safer code
     * Dependency Injection for better testability and maintainability
@@ -23,8 +23,7 @@ The TODO app includes several powerful features:
 * JWT Authentication and password hashing:
     * Secure token-based authentication using JSON Web Tokens using [`jwt-cpp`](https://github.com/Thalhammer/jwt-cpp)
     * Secure user password storage using OpenSSL
-
-* Advanced Macro Preprocessing using [`Boost::preprocessor`](https://github.com/boostorg/preprocessor) for generate database and JSON structs
+* Advanced Macro Preprocessing using [`Boost::preprocessor`](https://github.com/boostorg/preprocessor) for generating database and JSON structs
 * Unit Testing using [`Catch2`](https://github.com/catchorg/Catch2)
 
 ## Build and Run

@@ -69,6 +69,7 @@ async function loadTodos() {
             todoItem.className = `todo-item ${todo.is_done ? 'completed' : ''}`;
             todoItem.innerHTML = `
                 <h3>${todo.task}</h3>
+                <h8>Created at: ${todo.created_at}</h8>
                 <button onclick="toggleTodoStatus(${todo.id}, ${todo.is_done})">${todo.is_done ? 'Undo' : 'Complete'}</button>
                 <button onclick="deleteTodo(${todo.id})">Delete</button>
             `;

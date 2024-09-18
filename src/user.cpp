@@ -17,7 +17,7 @@ namespace http = delameta::http;
 extern auto db_open(const char*) -> sql_db;
 extern auto db_dependency(const http::RequestReader&, http::ResponseWriter&) -> sql_db;
 extern auto jwt_create_token(const std::vector<std::pair<std::string, std::string>>& payload) -> std::string;
-extern auto jwt_decode_token(const std::string& token) -> std::string;
+extern auto jwt_decode_token(const std::string& token) -> delameta::Result<std::string>;
 extern auto password_hash(const std::string& password) -> std::string;
 extern void todos_delete(uint64_t user_id, sql_db db);
 
@@ -81,6 +81,12 @@ HTTP_ROUTE(
         (UserForm, user, http::arg::json                  ),
     (http::Result<std::string>)
 ) {
+    if (user.username == "") {
+        return Err(http::Error{http::StatusBadRequest, "Username cannot be empty"});
+    } else if (user.password == "") {
+        return Err(http::Error{http::StatusBadRequest, "Password cannot be empty"});
+    }
+
     try {
         db(insert_into(users).set(
             users.username   = user.username,
@@ -141,15 +147,13 @@ HTTP_ROUTE(
     }
 
     auto token = (std::string)it->second.substr(bearer.size());
-    UserForm user{};
+    auto payload = TRY_OR(jwt_decode_token(token), {
+        return Err(http::Error{http::StatusUnauthorized, try_res.unwrap_err().what});
+    });
 
-    try {
-        delameta::json::deserialize(jwt_decode_token(token), user).unwrap();
-    } catch (const std::bad_variant_access&) {
-        return Err(http::Error{http::StatusInternalServerError, "Fail to deserialize JWT payload into User"});
-    } catch (const std::exception& e) {
-        return Err(http::Error{http::StatusUnauthorized, e.what()});
-    }
+    auto user = TRY_OR(delameta::json::deserialize<UserForm>(payload), {
+        return Err(http::Error{http::StatusInternalServerError, "Fail to deserialize JWT payload into UserForm"});
+    });
 
     return Ok(user.username);
 }

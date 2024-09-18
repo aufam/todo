@@ -60,8 +60,12 @@ HTTP_ROUTE(
         (std::string_view, task   , http::arg::json_item("task")                      )
         (bool            , is_done, http::arg::json_item_default_val("is_done", false))
     ,
-    (uint64_t)
+    (http::Result<uint64_t>)
 ) {
+    if (task == "") {
+        return Err(http::Error{http::StatusBadRequest, "Task cannot be empty"});
+    }
+
     db(insert_into(todos).set(
         todos.user_id    = user_id,
         todos.task       = task,
@@ -69,7 +73,7 @@ HTTP_ROUTE(
         todos.created_at = sqlpp::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now())
     ));
 
-    return db.last_insert_id();
+    return Ok(db.last_insert_id());
 }
 
 HTTP_ROUTE(
@@ -171,10 +175,10 @@ TEST_CASE("2. todo", "[todo]") {
     };
 
     SECTION("create") {
-        auto first_id = todo_create(1, db_open("test.db"), "new task", false);
+        auto first_id = todo_create(1, db_open("test.db"), "new task", false).unwrap();
         REQUIRE(first_id == 1);
     
-        auto second_id = todo_create(1, db_open("test.db"), "second task", false);
+        auto second_id = todo_create(1, db_open("test.db"), "second task", false).unwrap();
         REQUIRE(second_id == 2);
 
         auto todo_list = get_todo_list();
