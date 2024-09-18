@@ -5,5 +5,7 @@
 .*
 !.git*
 
+*.db
+
 compile_commands.json
 __pycache__

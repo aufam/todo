@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="assets/icon.ico" type="image/x-icon">
+    <title>Todo App</title>
+    <style>
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        @media (prefers-color-scheme: dark) {
+            body {
+                background-color: #3d3c3c;
+                color: rgb(170, 167, 167);
+            }
+        }
+        .container {
+            padding: 20px;
+        }
+        input, button {
+            padding: 10px;
+            margin: 5px;
+            width: 100%;
+        }
+        .todo-item {
+            /* display: flex; */
+            justify-content: space-between;
+            margin: 5px 0;
+            padding: 10px;
+            border: 1px solid #ddd;
+        }
+        .todo-item.completed {
+            text-decoration: line-through;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <img src="assets/header_light.png" alt="An example image">
+        <h1>Todo App</h1>
+
+        <!-- Authentication -->
+        <div id="auth-section">
+            <h2>Signup / Login</h2>
+            <input type="text" id="username" placeholder="Username">
+            <input type="password" id="password" placeholder="Password">
+            <button onclick="signup()">Signup</button>
+            <button onclick="login()">Login</button>
+            <p id="auth-status"></p>
+        </div>
+
+        <!-- Todo Management (visible only after login) -->
+        <div id="todo-section" style="display: none;">
+            <h2 id="header-title">My Todos</h2>
+            <input type="text" id="new-todo" placeholder="New Task">
+            <button onclick="createTodo()">Add Todo</button>
+
+            <div id="todo-list"></div>
+
+            <button onclick="logout()">Logout</button>
+        </div>
+    </div>
+
+    <!-- External JS -->
+    <script src="static/todo-app.js"></script>
+</body>
+</html>

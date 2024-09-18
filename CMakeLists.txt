@@ -8,6 +8,7 @@ add_executable(todo ${SOURCES})
 
 # external libraries
 include(cmake/CPM.cmake)
+
 CPMAddPackage("gh:aufam/delameta#main")
 CPMAddPackage("gh:boostorg/preprocessor#boost-1.86.0")
 CPMAddPackage("gh:fmtlib/fmt#11.0.2")
@@ -27,10 +28,11 @@ target_link_libraries(todo PRIVATE
     fmt
     jwt-cpp
     sqlpp11
+    sqlite3
     Catch2
 )
 
-# features
+# c++ standard
 target_compile_features(todo PRIVATE 
     cxx_std_23
 )
@@ -40,4 +42,11 @@ target_compile_options(todo PRIVATE
     -Wall 
     -Wextra 
     -pedantic
+    -Wno-attributes
+)
+
+# home dir
+set(HOME_DIR "${CMAKE_HOME_DIRECTORY}" CACHE STRING "Must contain `/assets` and `/static` directories")
+target_compile_definitions(todo PRIVATE 
+    HOME_DIR="${HOME_DIR}"
 )
