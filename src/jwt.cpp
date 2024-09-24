@@ -25,7 +25,7 @@ auto jwt_create_token(const std::vector<std::pair<std::string, std::string>>& pa
     return j.sign(ALGORITHM);
 }
 
-[[export, throw]]
+[[export]]
 auto jwt_decode_token(const std::string& token) -> Result<std::string> {
     try {
         auto decoded = jwt::decode(token);

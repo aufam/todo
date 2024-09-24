@@ -4,6 +4,7 @@
 #include <delameta/file.h>
 #include <delameta/utils.h>
 #include <dirent.h>
+#include <algorithm>
 
 using namespace Project;
 using delameta::File;

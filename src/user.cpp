@@ -9,7 +9,6 @@
 using namespace Project;
 using etl::Ok;
 using etl::Err;
-using etl::defer;
 using time_point = std::chrono::system_clock::time_point;
 using sql_db = sqlpp::sqlite3::connection;
 namespace http = delameta::http;
@@ -249,7 +248,7 @@ TEST_CASE("1. user", "[user]") {
         auto token_login = user_login(db_open("test.db"), {.username="Prapto", .password="qwerty"}).unwrap();
         REQUIRE(token_signup == token_login);
         token = token_signup;
-    };
+    }
 
     http::RequestReader req;
     http::ResponseWriter res;
@@ -260,21 +259,21 @@ TEST_CASE("1. user", "[user]") {
     SECTION("verify") {
         auto username = user_verify(req, res).unwrap();
         REQUIRE(username == "Prapto");
-    };
+    }
 
     SECTION("get id") {
         auto id = user_get_id(req, res).unwrap();
         REQUIRE(id == 1);
-    };
+    }
 
     SECTION("invalid user") {
         auto err = user_get(db_open("test.db"), "Sugeng").unwrap_err();
         REQUIRE(err.what == "User not found in the database");
-    };
+    }
 
     SECTION("list") {
         auto user_list = users_get("", db_open("test.db"), std::nullopt, std::nullopt, 10);
         REQUIRE(user_list.size() == 1);
         REQUIRE(user_list.front().username == "Prapto");
-    };
+    }
 }
