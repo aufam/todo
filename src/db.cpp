@@ -5,7 +5,7 @@
 
 using namespace Project::delameta;
 using sql_db = sqlpp::sqlite3::connection;
-const auto DB_PATH = HOME_DIR "/assets/database.db";
+const auto DB_PATH = "assets/database.db";
 
 [[export]]
 auto db_open(const char* path) -> sql_db {

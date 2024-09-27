@@ -27,7 +27,11 @@ HTTP_ROUTE(
         (std::string              , filename, http::arg::arg("filename")),
     (http::Result<void>)
 ) {
-    auto file = TRY(File::Open(File::Args{.filename=filename.c_str(), .mode="r"}));
+    auto file = TRY(
+        File::Open(FL, {"/usr/share/todo" + filename}).or_except([&](auto) {
+            return File::Open(FL, {HOME_DIR + filename});
+        })
+    );
 
     res->headers["Content-Type"] = delameta::get_content_type_from_file(filename);
     res->headers["Content-Length"] = std::to_string(file.file_size());
@@ -42,7 +46,7 @@ HTTP_ROUTE(
         (Ref<http::ResponseWriter>, res, http::arg::response),
     (http::Result<void>)
 ) {
-    return load_file(res, HOME_DIR "/static/index.html");
+    return load_file(res, "/static/index.html");
 }
 
 HTTP_ROUTE(
@@ -61,27 +65,30 @@ HTTP_ROUTE(
 
     paths.clear();
 
-    auto paths_append_from = [](const char* directory, const std::string& prefix) {
-        DIR* dir = ::opendir(directory);
+    auto paths_append_from = [](const std::string& prefix) {
+        std::string directory = HOME_DIR + prefix;
+        DIR* dir = ::opendir(directory.c_str());
         if (dir == nullptr) {
-            panic(FL, "Error opening static directory");
+            directory = "/usr/share/todo" + prefix;
+            dir = ::opendir(directory.c_str());
+            if (dir == nullptr) panic(FL, "Error opening static directory");
         }
 
         struct dirent* entry;
         while ((entry = ::readdir(dir)) != nullptr) {
-            paths.push_back(prefix + entry->d_name);
+            paths.push_back(prefix + '/' + entry->d_name);
         }
 
         ::closedir(dir);
     };
 
-    paths_append_from(HOME_DIR "/static", "/static/");
-    paths_append_from(HOME_DIR "/assets", "/assets/");
+    paths_append_from("/static");
+    paths_append_from("/assets");
 
     for (const auto& path: paths) {
         app.route(path, {"GET"}, std::tuple{http::arg::response},
         [=](Ref<http::ResponseWriter> res) {
-            return load_file(res, HOME_DIR + path);
+            return load_file(res, path);
         });
     }
 }
