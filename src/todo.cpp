@@ -26,8 +26,10 @@ SQLPP_DECLARE_TABLE(
     (is_done   , bool        , SQLPP_NOT_NULL   )
     (created_at, timestamp   , SQLPP_NOT_NULL   )
 )
+
 static const Todos::Todos todos;
 
+[[export]]
 void todos_create_table(const char* path) {
     auto db = db_open(path);
     db.execute(R"(CREATE TABLE IF NOT EXISTS Todos (
@@ -39,10 +41,6 @@ void todos_create_table(const char* path) {
     ))");
 }
 
-HTTP_SETUP(todos_setup, app) {
-    todos_create_table(nullptr);
-}
-
 JSON_DECLARE(
     (Todo)
     ,
@@ -51,6 +49,8 @@ JSON_DECLARE(
     (bool       , is_done   )
     (time_point , created_at)
 )
+
+HTTP_EXTERN_OBJECT(app);
 
 HTTP_ROUTE(
     ("/todo", ("POST")),

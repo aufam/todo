@@ -19,18 +19,20 @@ using etl::Ok;
 using etl::Err;
 namespace http = delameta::http;
 
+extern void users_create_table(const char* path);
+extern void todos_create_table(const char* path);
 static void on_sigint(std::function<void()> fn);
 static std::tm format_time_now();
 
 OPTS_MAIN(
     (TODO, "Simple todo list")
     ,
-    //  | Type |   Name  | Short |    Long   |              Help               |     Default     |
-        (URL   , host    ,  'H'  , "host"    , "Specify host to serve HTTP"    , "localhost:5000")
-        (int   , max_sock,  'j'  , "max-sock", "Set number of server socket   ", "4"             )
-        (bool  , verbose ,  'v'  , "verbose" , "Set verbosity"                                   )
-        (bool  , version ,  'V'  , "version" , "Print version"                                   )
-        (bool  , test    ,  't'  , "test"    , "Enable testing"                                  )
+    //  |    Type   |   Name  | Short |    Long   |              Help               |     Default     |
+        (URL        , host    ,  'H'  , "host"    , "Specify host to serve HTTP"    , "localhost:5000")
+        (int        , max_sock,  'j'  , "max-sock", "Set number of server socket"   , "4"             )
+        (bool       , verbose ,  'v'  , "verbose" , "Set verbosity"                                   )
+        (bool       , version ,  'V'  , "version" , "Print version"                                   )
+        (bool       , test    ,  't'  , "test"    , "Enable testing"                                  )
     ,
     (Result<void>)
 ) {
@@ -38,6 +40,8 @@ OPTS_MAIN(
         fmt::println("delameta: v" DELAMETA_VERSION);
         return Ok();
     }
+
+    Opts::verbose = verbose;
 
     if (test) {
         const char* argv[] = {"./test", "--order", "lex", ""};
@@ -54,19 +58,23 @@ OPTS_MAIN(
         return Ok();
     }
 
-    Opts::verbose = verbose;
-
-    Server<TCP> tcp_server;
-    app.bind(tcp_server);
+    users_create_table(nullptr);
+    todos_create_table(nullptr);
 
     app.logger = [](const std::string& ip, const http::RequestReader& req, const http::ResponseWriter& res) {
         fmt::println("{:%Y-%m-%d %H:%M:%S} {} {} {} {}", format_time_now(), ip, req.method, req.url.full_path, res.status);
     };
 
-    fmt::println("Starting server on {}", host.host);
+    Server<TCP> server;
+    app.bind(server, {.is_tcp_server=true});
 
-    on_sigint([&]() { tcp_server.stop(); });
-    return tcp_server.start(Server<TCP>::Args{.host=host.host, .max_socket=max_sock});
+    fmt::println("Starting server on {}", host.host);
+    on_sigint([&]() { server.stop(); });
+
+    return server.start(Server<TCP>::Args{
+        .host=host.host, 
+        .max_socket=max_sock
+    });
 }
 
 static void on_sigint(std::function<void()> fn) {

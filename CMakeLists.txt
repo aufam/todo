@@ -9,6 +9,10 @@ project(todo
 file(GLOB_RECURSE SOURCES src/*)
 add_executable(todo ${SOURCES})
 
+# sqlite3
+find_package(SQLite3 REQUIRED)
+target_link_libraries(todo PRIVATE sqlite3)
+
 # external libraries
 include(cmake/CPM.cmake)
 
@@ -26,7 +30,6 @@ target_link_libraries(todo PRIVATE
     fmt
     jwt-cpp
     sqlpp11
-    sqlite3
     Catch2
 )
 

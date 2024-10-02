@@ -31,7 +31,8 @@ SQLPP_DECLARE_TABLE(
 
 static const Users::Users users;
 
-auto users_create_table(const char* path) -> sql_db {
+[[export]]
+void users_create_table(const char* path) {
     auto db = db_open(path);
     db.execute(R"(CREATE TABLE IF NOT EXISTS Users (
         id         INTEGER        PRIMARY KEY,
@@ -39,12 +40,6 @@ auto users_create_table(const char* path) -> sql_db {
         password   VARCHAR(128)   NOT NULL,
         created_at TIMESTAMP      DEFAULT CURRENT_TIMESTAMP
     ))");
-
-    return db;
-}
-
-HTTP_SETUP(users_setup, app) {
-    users_create_table(nullptr);
 }
 
 JSON_DECLARE(
@@ -60,6 +55,8 @@ JSON_DECLARE(
     (std::string, username)
     (std::string, password)
 )
+
+HTTP_EXTERN_OBJECT(app);
 
 HTTP_ROUTE(
     ("/user/create-token", ("POST")),
