@@ -7,7 +7,7 @@ WORKDIR /root/todo
 
 COPY cmake/ cmake/
 COPY CMakeLists.txt .
-RUN touch src/main.cpp
+COPY src/main.cpp src/
 
 RUN cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=23
 
