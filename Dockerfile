@@ -7,8 +7,8 @@ WORKDIR /root/todo
 
 COPY cmake/ cmake/
 COPY CMakeLists.txt .
-COPY src/main.cpp src/
 
+RUN echo "" > src/dummy.cpp
 RUN cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=23
 
 COPY src/ src/
