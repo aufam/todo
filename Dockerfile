@@ -16,8 +16,17 @@ RUN cmake --build build -t delameta && \
 
 COPY src/ src/
 
-RUN cmake -B build
-RUN cmake --build build -t todo
+RUN cmake -B build -DCMAKE_EXE_LINKER_FLAGS="-static" -DCMAKE_FIND_STATIC_PREFER=ON && \
+    cmake --build build -t todo
+
+FROM alpine:3.20.3
+
+COPY --from=builder /root/todo/build/todo /usr/bin/todo
+COPY assets/ /usr/share/todo/assets/
+COPY static/ /usr/share/todo/static/
+
+WORKDIR /root/todo
+RUN todo --test
 
 EXPOSE 5000
-CMD ["./build/todo", "--host=0.0.0.0:5000"]
+CMD ["todo", "--host=0.0.0.0:5000"]

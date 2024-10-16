@@ -33,11 +33,6 @@ target_link_libraries(todo PRIVATE
     Catch2
 )
 
-# link options
-target_link_options(todo PRIVATE
-    -static-libstdc++
-)
-
 # warnings
 target_compile_options(todo PRIVATE
     -Wall 
@@ -90,3 +85,5 @@ set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Aufa")
 set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
 include(CPack)
 
+enable_testing()
+add_test(NAME test_all COMMAND "${PROJECT_BINARY_DIR}/todo" --test)
