@@ -54,9 +54,9 @@ To see more command-line options, use the --help flag:
 
 ## Build and Run with Docker
 ```bash
-docker build -t todo:gcc .
+docker build -t todo:alpine .
 docker run -d --name todo -p 5000:5000 \
-  -v .assets/:/root/todo/assets \
-  -v .static/:/root/todo/static \
-  -t todo:gcc
+  -v ./assets/:/root/todo/assets \
+  -v ./static/:/root/todo/static \
+  -t todo:alpine
 ```
