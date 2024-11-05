@@ -9,14 +9,14 @@ COPY CMakeLists.txt .
 
 RUN mkdir -p src/ && echo "" > src/dummy.cpp
 
-RUN cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=23
-RUN cmake --build build -t delameta && \
+RUN cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=23 -DCMAKE_EXE_LINKER_FLAGS="-static" -DOPENSSL_USE_STATIC_LIBS=TRUE && \
+    cmake --build build -t delameta && \
     cmake --build build -t fmt && \
     cmake --build build -t Catch2
 
 COPY src/ src/
 
-RUN cmake -B build -DCMAKE_EXE_LINKER_FLAGS="-static" -DCMAKE_FIND_STATIC_PREFER=ON && \
+RUN cmake -B build && \
     cmake --build build -t todo
 
 FROM alpine:3.20.3
