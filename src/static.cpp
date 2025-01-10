@@ -56,10 +56,7 @@ HTTP_ROUTE(
 ) {
     static std::list<std::string> paths;
     for (const auto& path: paths) {
-        auto it = std::find_if(app.routers.begin(), app.routers.end(), [&](http::Router& r) {
-            return r.path == path;
-        });
-
+        auto it = app.routers.find(path);
         if (it != app.routers.end()) app.routers.erase(it);
     }
 

@@ -16,18 +16,22 @@ target_link_libraries(todo PRIVATE sqlite3)
 # external libraries
 include(cmake/CPM.cmake)
 
-CPMAddPackage("gh:aufam/delameta#main")
-CPMAddPackage("gh:boostorg/preprocessor#boost-1.86.0")
 CPMAddPackage("gh:fmtlib/fmt#11.0.2")
+CPMAddPackage("gh:boostorg/preprocessor#boost-1.86.0")
+CPMAddPackage("gh:aufam/delameta#main")
 CPMAddPackage("gh:Thalhammer/jwt-cpp@0.6.0")
 CPMAddPackage("gh:HowardHinnant/date@3.0.1")
 CPMAddPackage("gh:rbock/sqlpp11#0.64")
 CPMAddPackage("gh:catchorg/Catch2@3.7.0")
 
+target_include_directories(todo PRIVATE
+    "${preprocessor_SOURCE_DIR}/include"
+)
+
 target_link_libraries(todo PRIVATE
-    delameta
+    fmt-header-only
     Boost::preprocessor
-    fmt
+    delameta
     jwt-cpp
     sqlpp11
     Catch2

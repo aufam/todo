@@ -1,7 +1,6 @@
 #include <boost/preprocessor.hpp>
 #include <fmt/chrono.h>
 #include <delameta/debug.h>
-#include <delameta/tcp.h>
 #include <delameta/http/http.h>
 #include <delameta/opts.h>
 #include <catch2/catch_session.hpp>
@@ -12,7 +11,6 @@ HTTP_DEFINE_OBJECT(app);
 
 using namespace Project;
 using delameta::URL;
-using delameta::TCP;
 using delameta::Server;
 using delameta::Result;
 using delameta::Opts;
@@ -20,25 +18,19 @@ using etl::Ok;
 using etl::Err;
 namespace http = delameta::http;
 
-extern void users_create_table(const char* path);
-extern void todos_create_table(const char* path);
+extern void users_create_table(const char* path = nullptr);
+extern void todos_create_table(const char* path = nullptr);
 
-static void on_sigint(std::function<void()> fn);
-static std::tm format_time_now();
-
-using Headers = std::unordered_map<std::string_view, std::string_view>;
-using Queries = std::unordered_map<std::string, std::string>;
+using Args = std::unordered_map<std::string, std::string>;
 
 template<>
-auto Opts::convert_string_into(const std::string& str) -> Result<Headers> {
-    if (str == "") return Ok(Headers{});
-    return json::deserialize<Headers>(str).except([](const char* err) { return Error{-1, err}; });
+auto Opts::convert_string_into(const std::string& str) -> Result<Args> {
+    if (str == "") return Ok(Args{});
+    return json::deserialize<Args>(str).except([](const char* err) { return Error{-1, err}; });
 }
 
-template<>
-auto Opts::convert_string_into(const std::string& str) -> Result<Queries> {
-    if (str == "") return Ok(Queries{});
-    return json::deserialize<Queries>(str).except([](const char* err) { return Error{-1, err}; });
+static auto now() {
+    return std::chrono::time_point_cast<std::chrono::seconds>(std::chrono::system_clock::now());
 }
 
 OPTS_MAIN(
@@ -52,8 +44,7 @@ OPTS_MAIN(
         (bool       , test    ,  't'  , "test"    , "Enable testing"                                  )
         (std::string, route   ,  'r'  , "route"   , "Execute HTTP route"            , ""              )
         (std::string, method  ,  'm'  , "method"  , "Specify HTTP method"           , ""              )
-        (Queries    , queries ,  'q'  , "queries" , "Specify URL queries"           , ""              )
-        (Headers    , headers ,  'a'  , "headers" , "Specify HTTP headers"          , ""              )
+        (Args       , headers ,  'a'  , "headers" , "Specify HTTP headers"          , ""              )
         (std::string, body    ,  'd'  , "body"    , "Specify HTTP body"             , ""              )
         (std::string, token   ,  'T'  , "token"   , "Specify access token"          , ""              )
         (bool       , is_json ,  'j'  , "is-json" , "Set data type to be json"                        )
@@ -70,7 +61,7 @@ OPTS_MAIN(
     Opts::verbose = verbose;
 
     if (test) {
-        const char* argv[] = {"./test", "--order", "lex", ""};
+        const char* argv[] = {"test", "--order", "lex", ""};
         const auto argc = sizeof(argv) / sizeof(size_t);
         if (verbose) argv[argc - 1] = "--success";
 
@@ -84,30 +75,33 @@ OPTS_MAIN(
         return Ok();
     }
 
-    users_create_table(nullptr);
-    todos_create_table(nullptr);
+    users_create_table();
+    todos_create_table();
 
     if (not route.empty()) {
-        if (method.empty()) method = body.empty() ? "GET" : "POST";
-        auto it = std::find_if(app.routers.begin(), app.routers.end(), [&](const http::Router& r) {
-            return r.path == route && std::find(r.methods.begin(), r.methods.end(), method) != r.methods.end();
-        });
-        if (it == app.routers.end()) {
-            return Err(delameta::Error{-1, fmt::format("cannot find route '{}'", route)});
-        }
+        class DummyClient : public delameta::StreamSessionClient {
+        public:
+            http::Http& http;
+            delameta::StringStream ss;
+            DummyClient(http::Http& http) : StreamSessionClient(ss), http(http), ss() {}
 
-        http::RequestReader req;
-        http::ResponseWriter res;
+            delameta::Result<std::vector<uint8_t>> request(delameta::Stream& in_stream) override {
+                in_stream >> ss;
+                auto [req, res] = http.execute(ss);
+                ss.flush();
+                res.dump() >> ss;
+                return Ok(std::vector<uint8_t>());
+            }
+        };
+        DummyClient dummy_client(app);
 
+        http::RequestWriter req;
+        if (method.empty()) req.method = body.empty() ? "GET" : "POST";
         req.version = "HTTP/1.1";
-        req.method = !method.empty() ? method : body.empty() ? "GET" : "POST";
-        req.url = std::move(uri);
-        req.url.path = route;
-        req.url.queries = std::move(queries);
+        req.url = uri.url + route;
         req.headers = std::move(headers);
 
-        std::string content_length;
-        req.headers["Content-Length"] = content_length = std::to_string(body.size());
+        req.headers["Content-Length"] = std::to_string(body.size());
         if (is_json) {
             req.headers["Content-Type"] = "application/json";
         } else if (is_text) {
@@ -119,75 +113,57 @@ OPTS_MAIN(
             req.headers["Authentication"] = token;
         }
 
-        req.body_stream << body;
+        auto res = delameta::http::request(dummy_client, std::move(req));
+        if (res.is_err()) {
+            return Err(std::move(res.unwrap_err()));
+        }
 
-        res.status = 200;
-        it->function(req, res);
-        res.body_stream >> [&](std::string_view sv) {
-            res.body += sv;
+        auto &response = res.unwrap();
+        response.body_stream >> [&](std::string_view sv) {
+            response.body += sv;
         };
 
-        fmt::println("{}", res.body);
-        if (res.status < 300) {
+        fmt::println("{}", response.body);
+        if (response.status < 300) {
             return Ok();
         } else {
-            return Err(delameta::Error{res.status, http::status_to_string(res.status)});
+            return Err(delameta::Error{response.status, http::status_to_string(response.status)});
         }
     }
 
     app.logger = [](const std::string& ip, const http::RequestReader& req, const http::ResponseWriter& res) {
-        fmt::println("{:%Y-%m-%d %H:%M:%S} {} {} {} {}", format_time_now(), ip, req.method, req.url.full_path, res.status);
+        fmt::println("{:%Y-%m-%d %H:%M:%S} {} {} {} {}", now(), ip, req.method, req.url.full_path, res.status);
     };
 
-    Server<TCP> server;
-    app.bind(server, {.is_tcp_server=true});
-
-    fmt::println("Starting server on {}", uri.host);
-    on_sigint([&]() { server.stop(); });
-
-    return server.start(Server<TCP>::Args{
-        .host=uri.host, 
+    fmt::println("Server is running on {}", uri.host);
+    return app.listen(http::Http::ListenArgs{
+        .host=uri.host,
         .max_socket=max_sock
     });
-}
-
-static void on_sigint(std::function<void()> fn) {
-    static std::function<void()> at_exit;
-    at_exit = std::move(fn);
-    auto sig = +[](int) { at_exit(); };
-    std::signal(SIGINT, sig);
-    std::signal(SIGTERM, sig);
-    std::signal(SIGQUIT, sig);
-}
-
-static std::tm format_time_now() {
-    auto now = std::chrono::system_clock::now();
-    std::time_t time_now = std::chrono::system_clock::to_time_t(now);
-    return fmt::localtime(time_now);
 }
 
 void delameta::info(const char* file, int line, const std::string& msg) {
     if (not Opts::verbose) return;
     if (line == 0) {
-        fmt::println("{:%Y-%m-%d %H:%M:%S} INFO: {}", format_time_now(), msg);
+        fmt::println("{:%Y-%m-%d %H:%M:%S} INFO: {}", now(), msg);
     } else {
-        fmt::println("{:%Y-%m-%d %H:%M:%S} {}:{} INFO: {}", format_time_now(), file, line, msg);
+        fmt::println("{:%Y-%m-%d %H:%M:%S} {}:{} INFO: {}", now(), file, line, msg);
     }
 }
 
 void delameta::warning(const char* file, int line, const std::string& msg) {
     if (line == 0) {
-        fmt::println("{:%Y-%m-%d %H:%M:%S} WARNING: {}", format_time_now(), msg);
+        fmt::println("{:%Y-%m-%d %H:%M:%S} WARNING: {}", now(), msg);
     } else {
-        fmt::println("{:%Y-%m-%d %H:%M:%S} {}:{} WARNING: {}", format_time_now(), file, line, msg);
+        fmt::println("{:%Y-%m-%d %H:%M:%S} {}:{} WARNING: {}", now(), file, line, msg);
     }
 }
 
 void delameta::panic(const char* file, int line, const std::string& msg) {
     if (line == 0) {
-        fmt::println("{:%Y-%m-%d %H:%M:%S} PANIC: {}", format_time_now(), msg);
+        fmt::println("{:%Y-%m-%d %H:%M:%S} PANIC: {}", now(), msg);
     } else {
-        fmt::println("{:%Y-%m-%d %H:%M:%S} {}:{} PANIC: {}", format_time_now(), file, line, msg);
+        fmt::println("{:%Y-%m-%d %H:%M:%S} {}:{} PANIC: {}", now(), file, line, msg);
     }
     exit(1);
 }
