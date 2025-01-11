@@ -1,19 +1,17 @@
 #include <boost/preprocessor.hpp>
 #include <fmt/chrono.h>
-#include <delameta/debug.h>
 #include <delameta/http/http.h>
 #include <delameta/opts.h>
+#include <delameta/debug.h>
 #include <catch2/catch_session.hpp>
-#include <csignal>
-#include <algorithm>
 
 HTTP_DEFINE_OBJECT(app);
 
 using namespace Project;
 using delameta::URL;
 using delameta::Server;
-using delameta::Result;
 using delameta::Opts;
+using delameta::Result;
 using etl::Ok;
 using etl::Err;
 namespace http = delameta::http;
@@ -45,6 +43,7 @@ OPTS_MAIN(
         (std::string, route   ,  'r'  , "route"   , "Execute HTTP route"            , ""              )
         (std::string, method  ,  'm'  , "method"  , "Specify HTTP method"           , ""              )
         (Args       , headers ,  'a'  , "headers" , "Specify HTTP headers"          , ""              )
+        (Args       , queries ,  'q'  , "queries" , "Specify HTTP URL queries"      , ""              )
         (std::string, body    ,  'd'  , "body"    , "Specify HTTP body"             , ""              )
         (std::string, token   ,  'T'  , "token"   , "Specify access token"          , ""              )
         (bool       , is_json ,  'j'  , "is-json" , "Set data type to be json"                        )
@@ -78,68 +77,72 @@ OPTS_MAIN(
     users_create_table();
     todos_create_table();
 
-    if (not route.empty()) {
-        class DummyClient : public delameta::StreamSessionClient {
-        public:
-            http::Http& http;
-            delameta::StringStream ss;
-            DummyClient(http::Http& http) : StreamSessionClient(ss), http(http), ss() {}
-
-            delameta::Result<std::vector<uint8_t>> request(delameta::Stream& in_stream) override {
-                in_stream >> ss;
-                auto [req, res] = http.execute(ss);
-                ss.flush();
-                res.dump() >> ss;
-                return Ok(std::vector<uint8_t>());
-            }
-        };
-        DummyClient dummy_client(app);
-
-        http::RequestWriter req;
-        if (method.empty()) req.method = body.empty() ? "GET" : "POST";
-        req.version = "HTTP/1.1";
-        req.url = uri.url + route;
-        req.headers = std::move(headers);
-
-        req.headers["Content-Length"] = std::to_string(body.size());
-        if (is_json) {
-            req.headers["Content-Type"] = "application/json";
-        } else if (is_text) {
-            req.headers["Content-Type"] = "text/plain";
-        } else if (is_form) {
-            req.headers["Content-Type"] = "application/x-www-form-urlencoded";
-        }
-        if (not token.empty()) {
-            req.headers["Authentication"] = token;
-        }
-
-        auto res = delameta::http::request(dummy_client, std::move(req));
-        if (res.is_err()) {
-            return Err(std::move(res.unwrap_err()));
-        }
-
-        auto &response = res.unwrap();
-        response.body_stream >> [&](std::string_view sv) {
-            response.body += sv;
-        };
-
-        fmt::println("{}", response.body);
-        if (response.status < 300) {
-            return Ok();
-        } else {
-            return Err(delameta::Error{response.status, http::status_to_string(response.status)});
-        }
-    }
-
     app.logger = [](const std::string& ip, const http::RequestReader& req, const http::ResponseWriter& res) {
         fmt::println("{:%Y-%m-%d %H:%M:%S} {} {} {} {}", now(), ip, req.method, req.url.full_path, res.status);
     };
 
-    fmt::println("Server is running on {}", uri.host);
-    return app.listen(http::Http::ListenArgs{
-        .host=uri.host,
-        .max_socket=max_sock
-    });
+    if (route.empty()) {
+        fmt::println("Server is running on {}", uri.host);
+        return app.listen(http::Http::ListenArgs{
+            .host=uri.host,
+            .max_socket=max_sock
+        });
+    }
+
+    class DummyClient : public delameta::StreamSessionClient {
+    public:
+        http::Http& http;
+        delameta::StringStream ss;
+        DummyClient(http::Http& http) : StreamSessionClient(ss), http(http), ss() {}
+
+        delameta::Result<std::vector<uint8_t>> request(delameta::Stream& in_stream) override {
+            in_stream >> ss;
+            auto [req, res] = http.execute(ss);
+            ss.flush();
+            res.dump() >> ss;
+            return Ok(std::vector<uint8_t>());
+        }
+    };
+    DummyClient dummy_client(app);
+
+    http::RequestWriter req;
+    if (method.empty()) req.method = body.empty() ? "GET" : "POST";
+    req.version = "HTTP/1.1";
+    req.url = uri.url + route;
+
+    req.headers["Content-Length"] = std::to_string(body.size());
+    req.body = std::move(body);
+    if (is_json) {
+        req.headers["Content-Type"] = "application/json";
+    } else if (is_text) {
+        req.headers["Content-Type"] = "text/plain";
+    } else if (is_form) {
+        req.headers["Content-Type"] = "application/x-www-form-urlencoded";
+    }
+
+    if (not token.empty()) {
+        req.headers["Authentication"] = token;
+    }
+
+    req.headers.merge(headers);
+    req.url.queries.merge(queries);
+
+    auto res = http::request(dummy_client, std::move(req));
+    if (res.is_err()) {
+        return Err(std::move(res.unwrap_err()));
+    }
+
+    auto &response = res.unwrap();
+    response.body_stream >> [&](std::string_view sv) {
+        response.body += sv;
+    };
+
+    fmt::println("{}", response.body);
+    if (response.status < 300) {
+        return Ok();
+    } else {
+        return Err(delameta::Error{response.status, http::status_to_string(response.status)});
+    }
 }
 
 void delameta::info(const char* file, int line, const std::string& msg) {
